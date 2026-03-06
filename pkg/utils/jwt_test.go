@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"crypto/x509"
+	"encoding/pem"
+	"strings"
 )
 
 // setupTestJWTManager generates a fresh 2048-bit RSA key pair purely for testing.
@@ -103,5 +107,75 @@ func TestVerifyTokenFailures(t *testing.T) {
 				t.Errorf("CRITICAL: Expected VerifyToken to fail for '%s', but it succeeded", tc.name)
 			}
 		})
+	}
+}
+func TestVerifyToken_MissingClaims(t *testing.T) {
+	manager := setupTestJWTManager(t)
+
+	// Create a token with no "sub" and no "role" using map claims
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"exp": time.Now().Add(15 * time.Minute).Unix(),
+		// intentionally omit "sub" and "role"
+	})
+	tokenString, err := token.SignedString(manager.privateKey)
+	if err != nil {
+		t.Fatalf("Failed to sign token: %v", err)
+	}
+
+	_, err = manager.VerifyToken(tokenString)
+	if err == nil {
+		t.Error("Expected error for missing claims, got nil")
+	}
+}
+
+func TestParseKeysFromPEM(t *testing.T) {
+	// Generate a real key pair (same as setupTestJWTManager)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("Failed to generate RSA key: %v", err)
+	}
+
+	// Convert private key to PEM string (PKCS1 format for example)
+	privPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+	// Convert public key to PEM (PKIX format)
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		t.Fatalf("Failed to marshal public key: %v", err)
+	}
+	pubPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubBytes,
+	})
+
+	// Now simulate reading from .env: the PEM strings may have escaped newlines.
+	// To be realistic, we could join them with literal "\n" and then replace.
+	privStr := strings.ReplaceAll(string(privPEM), "\n", "\\n")
+	pubStr := strings.ReplaceAll(string(pubPEM), "\n", "\\n")
+
+	// In main, we would replace back
+	parsedPriv, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(strings.ReplaceAll(privStr, "\\n", "\n")))
+	if err != nil {
+		t.Fatalf("Failed to parse private key from escaped PEM: %v", err)
+	}
+	parsedPub, err := jwt.ParseRSAPublicKeyFromPEM([]byte(strings.ReplaceAll(pubStr, "\\n", "\n")))
+	if err != nil {
+		t.Fatalf("Failed to parse public key from escaped PEM: %v", err)
+	}
+
+	// Verify the parsed keys work by signing and verifying a token
+	manager := NewJWTManager(parsedPriv, parsedPub)
+	token, err := manager.GenerateToken("test", "user", time.Minute)
+	if err != nil {
+		t.Fatalf("GenerateToken with parsed keys failed: %v", err)
+	}
+	claims, err := manager.VerifyToken(token)
+	if err != nil {
+		t.Fatalf("VerifyToken with parsed keys failed: %v", err)
+	}
+	if claims.UserID != "test" {
+		t.Errorf("Expected userID 'test', got %s", claims.UserID)
 	}
 }

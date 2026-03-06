@@ -54,9 +54,18 @@ func (m *JWTManager) VerifyToken(tokenString string) (*CustomClaims, error) {
 	if err != nil {
 		return nil, fmt.Errorf("token verification failed: %w", err)
 	}
-
-	if claims, ok := token.Claims.(*CustomClaims); ok && token.Valid {
-		return claims, nil
+	claims, ok := token.Claims.(*CustomClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token claims")
 	}
-	return nil, errors.New("invalid token claims")
+
+	// 🔐 REQUIRED: Validate that essential claims are present
+	if claims.UserID == "" {
+		return nil, errors.New("missing user ID claim")
+	}
+	if claims.Role == "" {
+		return nil, errors.New("missing role claim")
+	}
+
+	return claims, nil
 }

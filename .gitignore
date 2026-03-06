@@ -26,6 +26,8 @@ go.work.sum
 
 # env file
 .env
+private.pem
+public.pem
 
 # Editor/IDE
 # .idea/
