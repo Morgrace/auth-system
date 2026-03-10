@@ -40,10 +40,11 @@ type ErrorPayload struct {
 }
 
 type APIResponse struct {
-	Status ResponseStatus `json:"status"`
-	Data   interface{}    `json:"data,omitempty"`
-	Error  *ErrorPayload  `json:"error,omitempty"`
-	Meta   Meta           `json:"meta"`
+	Status  ResponseStatus `json:"status"`
+	Data    interface{}    `json:"data,omitempty"`
+	Message string         `json:"message,omitempty"`
+	Error   *ErrorPayload  `json:"error,omitempty"`
+	Meta    Meta           `json:"meta"`
 }
 
 func generateMeta(r *http.Request) Meta {
@@ -61,11 +62,16 @@ func writeJSON(w http.ResponseWriter, status int, payload APIResponse) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-func WriteSuccess(w http.ResponseWriter, r *http.Request, statusCode int, data interface{}) {
+func WriteSuccess(w http.ResponseWriter, r *http.Request, statusCode int, data interface{}, message ...string) {
+	msg := ""
+	if len(message) > 0 {
+		msg = message[0]
+	}
 	payload := APIResponse{
-		Status: StatusSuccess,
-		Data:   data,
-		Meta:   generateMeta(r),
+		Status:  StatusSuccess,
+		Data:    data,
+		Message: msg,
+		Meta:    generateMeta(r),
 	}
 	writeJSON(w, statusCode, payload)
 }
