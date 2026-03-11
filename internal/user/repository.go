@@ -56,7 +56,7 @@ func (r *repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("Failed to get user by ID %s: %w", id, err)
+		return nil, fmt.Errorf("failed to get user by ID %s: %w", id, err)
 	}
 	return &user, nil
 }
@@ -77,13 +77,13 @@ func (r *repository) Create(ctx context.Context, user *User) (*User, error) {
 
 	rows, err := r.db.NamedQueryContext(ctx, query, user)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create user: %w", err)
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 	defer rows.Close()
 
 	if rows.Next() {
 		if err := rows.StructScan(user); err != nil {
-			return nil, fmt.Errorf("Failed to scan created user: %w", err)
+			return nil, fmt.Errorf("failed to scan created user: %w", err)
 		}
 	} else {
 		return nil, fmt.Errorf("No rows returned after insert")
@@ -101,7 +101,7 @@ func (r *repository) GetByEmail(ctx context.Context, email string) (*User, error
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("Failed to get user by email %s: %w", email, err)
+		return nil, fmt.Errorf("failed to get user by email %s: %w", email, err)
 	}
 	return &user, nil
 }
@@ -116,7 +116,7 @@ func (r *repository) GetByEmailVerificationToken(ctx context.Context, tokenHash 
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("Failed to get user by email verification token: %w", err)
+		return nil, fmt.Errorf("failed to get user by email verification token: %w", err)
 	}
 	return &user, nil
 }
@@ -147,11 +147,11 @@ func (r *repository) Update(ctx context.Context, user *User) error {
     `
 	result, err := r.db.NamedExecContext(ctx, query, user)
 	if err != nil {
-		return fmt.Errorf("Failed to update user %s: %w", user.ID, err)
+		return fmt.Errorf("failed to update user %s: %w", user.ID, err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("Failed to get rows affected after update: %w", err)
+		return fmt.Errorf("failed to get rows affected after update: %w", err)
 	}
 	if rows == 0 {
 		// This means the user was not found (or was soft-deleted)
@@ -164,11 +164,11 @@ func (r *repository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE users SET deleted_at = NOW(), is_active = false, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("Failed to soft delete user %s: %w", id, err)
+		return fmt.Errorf("failed to soft delete user %s: %w", id, err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("Failed to get rows affected after soft delete: %w", err)
+		return fmt.Errorf("failed to get rows affected after soft delete: %w", err)
 	}
 	if rows == 0 {
 		return fmt.Errorf("user %s not found or already deleted", id)
