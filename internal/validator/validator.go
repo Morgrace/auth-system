@@ -2,13 +2,32 @@ package validator
 
 import (
 	"errors"
+	"reflect"
+	"strings"
 
 	appErrors "github.com/Morgrace/auth-system/pkg/utils/errors"
 
 	"github.com/go-playground/validator/v10"
 )
 
-var validate = validator.New()
+var validate *validator.Validate
+
+func init() {
+	validate = validator.New()
+
+	// Tell the validator to read the "json" tag for field names
+	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		if name == "-" {
+			return ""
+		}
+		return name
+	})
+
+	// Register custom aliases
+	validate.RegisterAlias("app_email", "required,email,max=255")
+	validate.RegisterAlias("app_password", "required,min=8,max=72")
+}
 
 func ValidateOne(s any) appErrors.ValidationErrors {
 	err := validate.Struct(s)
@@ -56,7 +75,8 @@ func ValidateBatch[T any](items []T) appErrors.ValidationErrors {
 		err := validate.Struct(item)
 		if err != nil {
 			// pass the current index so errors from this item include it
-			batchErrs := parseValidationErr(err, &i)
+			idx := i
+			batchErrs := parseValidationErr(err, &idx)
 			allErrors = append(allErrors, batchErrs...)
 		}
 	}

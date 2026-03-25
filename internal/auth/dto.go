@@ -1,62 +1,39 @@
 package auth
 
 import (
-	"time"
-
-	"github.com/google/uuid"
+	"github.com/Morgrace/auth-system/internal/user"
 )
-
-// Reusable embedded types
-type Email struct {
-	Email string `json:"email" validate:"required,email,max=255"`
-}
-type Password struct {
-	Password string `json:"password" validate:"required,min=8,max=72"`
-}
 
 // Requests
 type RegisterRequest struct {
 	FirstName string `json:"first_name" validate:"required,min=2,max=50"`
 	LastName  string `json:"last_name" validate:"required,min=2,max=50"`
-	Email
-	Password
+	Email     string `json:"email" validate:"app_email"`
+	Password  string `json:"password" validate:"app_password"`
 }
 
 type LoginRequest struct {
-	Email
-	Password
+	Email string `json:"email" validate:"app_email"`
+	// Security Fix: Do not use app_password here. See AppSec note below.
+	Password string `json:"password" validate:"required"`
 }
 
 type ResendVerificationRequest struct {
-	Email
+	Email string `json:"email" validate:"app_email"`
 }
+
 type ForgotPasswordRequest struct {
-	Email
+	Email string `json:"email" validate:"app_email"`
 }
 
 type ResetPasswordRequest struct {
-	Password
+	Password string `json:"password" validate:"app_password"`
+	// eqfield matches the exact struct field name (Password), not the JSON tag
 	PasswordConfirm string `json:"password_confirm" validate:"required,eqfield=Password"`
 }
 
-// Responses
-type UserResponse struct {
-	ID              uuid.UUID `json:"id"`
-	FirstName       string    `json:"first_name"`
-	LastName        string    `json:"last_name"`
-	Email           string    `json:"email"`
-	Role            string    `json:"role"`
-	IsEmailVerified bool      `json:"is_email_verified"`
-	IsActive        bool      `json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-}
-
 type AuthResponse struct {
-	AccessToken string       `json:"access_token"`
-	User        UserResponse `json:"user"`
-}
-
-type MessageResponse struct {
-	Message string `json:"message"`
+	AccessToken  string            `json:"access_token"`
+	RefreshToken string            `json:"refresh_token"`
+	User         user.UserResponse `json:"user"`
 }

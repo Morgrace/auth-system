@@ -23,6 +23,7 @@ type Repository interface {
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
 	// DeleteExpired removes all expired refresh tokens from the database.
 	DeleteExpired(ctx context.Context) error
+	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
 }
 
 type repository struct {
@@ -36,9 +37,9 @@ func NewRepository(db *sqlx.DB) Repository {
 // Create inserts a new refresh token.
 func (r *repository) Create(ctx context.Context, token *RefreshToken) error {
 	query := `INSERT INTO refresh_tokens (
-	id, user_id, token_hash, device_info, ip_address, expires_at, is_revoked, created_at)
+	id, user_id, token_hash, family_id, device_info, ip_address, expires_at, is_revoked, created_at)
 	VALUES (
-	:id, :user_id, :token_hash, :device_info, :ip_address, :expires_at, :is_revoked, :created_at)`
+	:id, :user_id, :token_hash, :family_id, :device_info, :ip_address, :expires_at, :is_revoked, :created_at)`
 
 	_, err := r.db.NamedExecContext(ctx, query, token)
 	if err != nil {
@@ -101,6 +102,15 @@ func (r *repository) DeleteExpired(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to delete expired refresh tokens: %w", err)
+	}
+	return nil
+}
+
+func (r *repository) RevokeFamily(ctx context.Context, familyID uuid.UUID) error {
+	query := `UPDATE refresh_tokens SET is_revoked = true WHERE family_id = $1 and is_revoked = false`
+	_, err := r.db.ExecContext(ctx, query, familyID)
+	if err != nil {
+		return fmt.Errorf("failed to revoke token family %s: %w", familyID, err)
 	}
 	return nil
 }
