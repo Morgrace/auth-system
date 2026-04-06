@@ -1,8 +1,15 @@
 package auth
 
-import "net/http"
+import (
+	"net/http"
 
-func RegisterRoutes(mux *http.ServeMux, h *Handler) {
+	"github.com/Morgrace/auth-system/internal/middleware"
+)
+
+func RegisterRoutes(mux *http.ServeMux, h *Handler, authMW *middleware.AuthMiddleware) {
+	protect := func(next http.HandlerFunc) http.Handler {
+		return authMW.Protect(next)
+	}
 	mux.HandleFunc("POST /auth/register", h.Register)
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("POST /auth/refresh-token", h.RefreshToken)
@@ -12,5 +19,6 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("POST /auth/reset-password/{token}", h.ResetPassword)
 
 	// Protected:
-	mux.HandleFunc("POST /auth/logout", h.Logout)
+
+	mux.Handle("POST /auth/logout", protect(h.Logout))
 }
