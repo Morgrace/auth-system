@@ -2,19 +2,24 @@ package mailer
 
 import (
 	"testing"
+
+	"github.com/Morgrace/auth-system/internal/config"
+	"github.com/joho/godotenv"
 )
 
 // TestSendTestEmail sends a test email using the SMTP config from .env.
 // Run with: go test -v -run TestSendTestEmail
 func TestSendTestEmail(t *testing.T) {
+	godotenv.Load("../../.env")
+	cfg := config.Load()
 
 	mailer := NewSMTPMailer(
-		"smtp-relay.brevo.com",
-		"465",
-		"a54c6c001@smtp-brevo.com",
-		"xsmtpsib-57ee70a1b419663576af797dbd2462baa45c014ae8a96682642001d38f1aa1da-T2gLIJxpQcfQ3ZIi",
-		"mmorgrace@gmail.com",
-		"http://localhost:3000",
+		cfg.SMTPHost,
+		cfg.SMTPPort,
+		cfg.SMTPUsername,
+		cfg.SMTPPassword,
+		cfg.SMTPFrom,
+		cfg.ClientURL,
 	)
 
 	// CHANGE THIS to your own email address for testing
