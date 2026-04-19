@@ -3,7 +3,7 @@ package user
 import (
 	"net/http"
 
-	"github.com/Morgrace/auth-system/internal/middleware"
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/Morgrace/auth-system/pkg/utils"
 	appErrors "github.com/Morgrace/auth-system/pkg/utils/errors"
 	"github.com/google/uuid"
@@ -18,7 +18,7 @@ func NewHandler(service Service) *Handler {
 }
 
 func getUserID(r *http.Request) (uuid.UUID, error) {
-	id, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	id, ok := r.Context().Value(types.UserIDKey).(uuid.UUID)
 	if !ok {
 		return uuid.Nil, appErrors.ErrUnauthorized
 	}

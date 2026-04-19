@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/golang-jwt/jwt/v5"
 
 	"crypto/x509"
@@ -26,7 +27,7 @@ func setupTestJWTManager(t *testing.T) *JWTManager {
 func TestGenerateAndVerifyToken(t *testing.T) {
 	manager := setupTestJWTManager(t)
 	userID := "user-123"
-	role := "admin"
+	role := types.RoleAdmin
 
 	// Step 1: Generate the token
 	tokenString, err := manager.GenerateToken(userID, role, 15*time.Minute)
@@ -58,7 +59,7 @@ func TestVerifyTokenFailures(t *testing.T) {
 	hackerManager := setupTestJWTManager(t) // A completely separate keypair
 
 	userID := "user-123"
-	role := "user"
+	role := types.RoleUser
 
 	// Create an expired token (expired 1 hour ago)
 	expiredToken, _ := manager.GenerateToken(userID, role, -1*time.Hour)

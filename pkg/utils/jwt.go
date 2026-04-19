@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -22,13 +23,13 @@ func NewJWTManager(privKey *rsa.PrivateKey, pubKey *rsa.PublicKey) *JWTManager {
 }
 
 type CustomClaims struct {
-	UserID string `json:"sub"` // "sub" (Subject) is the RFC standard for the user's ID
-	Role   string `json:"role"`
+	UserID string     `json:"sub"` // "sub" (Subject) is the RFC standard for the user's ID
+	Role   types.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken signs a new JWT using the Private Key (RS256)
-func (m *JWTManager) GenerateToken(userID string, role string, duration time.Duration) (string, error) {
+func (m *JWTManager) GenerateToken(userID string, role types.Role, duration time.Duration) (string, error) {
 	claims := CustomClaims{
 		UserID: userID,
 		Role:   role,

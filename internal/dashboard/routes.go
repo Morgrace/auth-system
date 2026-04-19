@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Morgrace/auth-system/internal/middleware"
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/Morgrace/auth-system/pkg/utils"
 )
 
@@ -15,8 +16,8 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, authMW *middleware.AuthMiddl
 	mux.Handle("GET /user/dashboard", authMW.Protect(http.HandlerFunc(h.UserDashboard)))
 
 	// Admin dashboard – requires role "admin" or "super_admin"
-	mux.Handle("GET /admin/dashboard", utils.ApplyMiddlewares(http.HandlerFunc(h.AdminDashboard), authMW.Protect, roleMW.Require(middleware.RoleAdmin, middleware.RoleSuperAdmin)))
+	mux.Handle("GET /admin/dashboard", utils.ApplyMiddlewares(http.HandlerFunc(h.AdminDashboard), authMW.Protect, roleMW.Require(types.RoleSuperAdmin, types.RoleSuperAdmin)))
 
 	// Super Admin dashboard – requires role "super_admin"
-	mux.Handle("GET /super-admin/dashboard", authMW.Protect(roleMW.Require(middleware.RoleSuperAdmin)(http.HandlerFunc(h.SuperAdminDashboard))))
+	mux.Handle("GET /super-admin/dashboard", authMW.Protect(roleMW.Require(types.RoleSuperAdmin)(http.HandlerFunc(h.SuperAdminDashboard))))
 }

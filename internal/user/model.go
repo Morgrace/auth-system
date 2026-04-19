@@ -3,23 +3,18 @@ package user
 import (
 	"time"
 
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/google/uuid"
 )
 
-type Role string
 
-const (
-	RoleSuperAdmin Role = "super_admin"
-	RoleAdmin      Role = "admin"
-	RoleUser       Role = "user"
-)
 
 type User struct {
 	ID                       uuid.UUID  `db:"id" json:"id"`
 	FirstName                string     `db:"first_name" json:"first_name"`
 	LastName                 string     `db:"last_name" json:"last_name"`
 	Email                    string     `db:"email" json:"email"`
-	Role                     Role       `db:"role" json:"role"`
+	Role                     types.Role       `db:"role" json:"role"`
 	IsEmailVerified          bool       `db:"is_email_verified" json:"is_email_verified"`
 	EmailVerificationToken   *string    `db:"email_verification_token" json:"-"` // hash, not exposed
 	EmailVerificationExpires *time.Time `db:"email_verification_expires" json:"-"`

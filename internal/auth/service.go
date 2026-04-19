@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Morgrace/auth-system/internal/config"
+	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/Morgrace/auth-system/internal/user"
 	"github.com/Morgrace/auth-system/pkg/utils"
 	appErrors "github.com/Morgrace/auth-system/pkg/utils/errors"
@@ -100,7 +101,7 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (*user.Mess
 		FirstName:                req.FirstName,
 		LastName:                 req.LastName,
 		Email:                    req.Email,
-		Role:                     user.RoleUser,
+		Role:                     types.RoleUser,
 		IsEmailVerified:          false,
 		EmailVerificationToken:   &hashedToken,
 		EmailVerificationExpires: &expiresAt,
@@ -143,7 +144,7 @@ func (s *service) Login(ctx context.Context, req LoginRequest, deviceInfo, ipAdd
 		return nil, appErrors.ErrUnauthorized
 	}
 
-	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), string(u.Role), s.cfg.JWTAccessTokenExp)
+	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), u.Role, s.cfg.JWTAccessTokenExp)
 	if err != nil {
 		return nil, fmt.Errorf("service: login generate access token: %w", err)
 	}
@@ -245,7 +246,7 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ip
 	}
 
 	// Generate new access token
-	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), string(u.Role), s.cfg.JWTAccessTokenExp)
+	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), u.Role, s.cfg.JWTAccessTokenExp)
 	if err != nil {
 		return nil, fmt.Errorf("service: refresh token generate access: %w", err)
 	}

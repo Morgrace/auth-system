@@ -33,6 +33,15 @@ type Config struct {
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
 	ShutdownTimeout time.Duration
+
+	// Mailer Configuration
+	// SMTP Configuration
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
+	ClientURL string
 }
 
 // Load reads the environment variables and populates the Config struct.
@@ -62,6 +71,13 @@ func Load() *Config {
 		ReadTimeout:     time.Duration(getEnvAsInt("READ_TIMEOUT", 10)) * time.Second,
 		WriteTimeout:    time.Duration(getEnvAsInt("WRITE_TIMEOUT", 10)) * time.Second,
 		ShutdownTimeout: time.Duration(getEnvAsInt("SHUTDOWN_TIMEOUT", 10)) * time.Second,
+
+		SMTPHost:     getEnvOrPanic("SMTP_HOST"),
+		SMTPPort:     getEnv("SMTP_PORT", "587"),
+		SMTPUsername: getEnvOrPanic("SMTP_USERNAME"),
+		SMTPPassword: getEnvOrPanic("SMTP_PASSWORD"),
+		SMTPFrom:     getEnv("SMTP_FROM", "noreply@yourapp.com"),
+		ClientURL: getEnv("CLIENT_URL", "http://localhost:3000"),
 	}
 }
 
