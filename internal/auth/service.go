@@ -17,7 +17,6 @@ import (
 )
 
 type Mailer interface {
-	//BREVO
 	SendVerificationEmail(to, token string) error
 	SendPasswordResetEmail(to, token string) error
 }
@@ -32,6 +31,7 @@ type Service interface {
 	ResetPassword(ctx context.Context, token string, req ResetPasswordRequest) (*user.MessageResponse, error)
 	Logout(ctx context.Context, refreshToken string) (*user.MessageResponse, error)
 }
+
 type service struct {
 	userRepo   user.Repository
 	authRepo   Repository
@@ -56,40 +56,33 @@ func NewService(
 	}
 }
 
-// hashToken SHA256 hashes a raw token string.
 func hashToken(token string) string {
 	h := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(h[:])
 }
 
-// generateToken creates a new UUID and returns both raw and hashed versions.
 func generateToken() (raw string, hashed string) {
 	raw = uuid.New().String()
 	hashed = hashToken(raw)
 	return
 }
 
-// Register creates a new user account and sends a verification email.
 func (s *service) Register(ctx context.Context, req RegisterRequest) (*user.MessageResponse, error) {
-	// Check if user already exists
 	existing, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, fmt.Errorf("service: register check email: %w", err)
 	}
 	if existing != nil {
-		return nil, appErrors.ErrConflict
+		return nil, appErrors.NewConflict("An account with this email already exists")
 	}
 
-	// Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, fmt.Errorf("service: register hash password: %w", err)
 	}
 
-	// Generate email verification token
 	rawToken, hashedToken := generateToken()
 	expiresAt := time.Now().Add(24 * time.Hour)
-
 	now := time.Now()
 
 	uid, err := uuid.NewV7()
@@ -111,37 +104,32 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (*user.Mess
 		UpdatedAt:                now,
 	}
 	created, err := s.userRepo.Create(ctx, newUser)
-
 	if err != nil {
 		return nil, fmt.Errorf("service: register create user: %w", err)
 	}
 	if err := s.mailer.SendVerificationEmail(created.Email, rawToken); err != nil {
-		// Log error but don't fail registration – maybe retry later
-		// In production, you might want to queue this.
+		log.Printf("📧 service register send verification email failed: %v ", err)
 	}
 	return &user.MessageResponse{
 		Message: "Registration successful. Please check your email to verify your account",
 	}, nil
 }
 
-// Login authenticates a user and returns access and refresh tokens.
 func (s *service) Login(ctx context.Context, req LoginRequest, deviceInfo, ipAddress string) (*AuthResponse, error) {
-	// Get user by email
 	u, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, fmt.Errorf("service: login get user: %w", err)
 	}
 	if u == nil || !u.IsActive {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewInvalidCredentials("Invalid email or password")
 	}
 
-	// Check password
 	ok, err := utils.CheckPassword(req.Password, u.PasswordHash)
 	if err != nil {
 		return nil, fmt.Errorf("service: login check password: %w", err)
 	}
 	if !ok {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewInvalidCredentials("Invalid email or password")
 	}
 
 	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), u.Role, s.cfg.JWTAccessTokenExp)
@@ -149,14 +137,13 @@ func (s *service) Login(ctx context.Context, req LoginRequest, deviceInfo, ipAdd
 		return nil, fmt.Errorf("service: login generate access token: %w", err)
 	}
 
-	// Generate refresh token
 	rawRefresh, hashedRefresh := generateToken()
 	refreshExp := time.Now().Add(s.cfg.JWTRefreshTokenExp)
+
 	uid, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate uuid: %w", err)
 	}
-
 	familyID, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate family uuid: %w", err)
@@ -183,49 +170,42 @@ func (s *service) Login(ctx context.Context, req LoginRequest, deviceInfo, ipAdd
 }
 
 func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ipAddress string) (*AuthResponse, error) {
-	// Hash the incoming token to look up in DB
 	hashed := hashToken(refreshToken)
 
-	// Look up in DB
 	stored, err := s.authRepo.GetByTokenHash(ctx, hashed)
 	if err != nil {
 		return nil, fmt.Errorf("service: refresh token get: %w", err)
 	}
 	if stored == nil {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewInvalidToken("Invalid or expired refresh token")
 	}
-	// REUSE DETECTED — token exists but is already revoked
-	// someone is replaying an old token → nuke the entire family
+
 	if stored.IsRevoked {
 		if err := s.authRepo.RevokeFamily(ctx, stored.FamilyID); err != nil {
 			log.Printf("service: failed to revoke family on reuse detection : %v", err)
 		}
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewInvalidToken("Refresh token has already been used")
 	}
 
-	// expired
 	if stored.ExpiresAt.Before(time.Now()) {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewExpiredToken("Refresh token has expired, please login again")
 	}
 
-	// Get the users
 	u, err := s.userRepo.GetByID(ctx, stored.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("service: refresh token get user: %w", err)
 	}
 	if u == nil || !u.IsActive {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewUnauthorized("User account is inactive or does not exist")
 	}
 
-	// Revoke the old token
 	if err := s.authRepo.Revoke(ctx, stored.ID); err != nil {
 		return nil, fmt.Errorf("service: refresh token revoke old: %w", err)
 	}
 
-	// Generate new refresh token - capture raw and hashed
-	// new token inherits same FamilyID
 	rawNew, hashedNew := generateToken()
 	newExp := time.Now().Add(s.cfg.JWTRefreshTokenExp)
+
 	uid, err := uuid.NewV7()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate uuid: %w", err)
@@ -234,7 +214,7 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ip
 		ID:         uid,
 		UserID:     u.ID,
 		TokenHash:  hashedNew,
-		FamilyID:   stored.FamilyID, // inherit - same family, not a new one
+		FamilyID:   stored.FamilyID,
 		DeviceInfo: &deviceInfo,
 		IPAddress:  &ipAddress,
 		ExpiresAt:  newExp,
@@ -245,7 +225,6 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ip
 		return nil, fmt.Errorf("service: refresh token create new: %w", err)
 	}
 
-	// Generate new access token
 	accessToken, err := s.jwtManager.GenerateToken(u.ID.String(), u.Role, s.cfg.JWTAccessTokenExp)
 	if err != nil {
 		return nil, fmt.Errorf("service: refresh token generate access: %w", err)
@@ -257,7 +236,6 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ip
 	}, nil
 }
 
-// VerifyEmail confirms a user's email address using the token from the verification link.
 func (s *service) VerifyEmail(ctx context.Context, token string) (*user.MessageResponse, error) {
 	hashed := hashToken(token)
 	u, err := s.userRepo.GetByEmailVerificationToken(ctx, hashed)
@@ -265,7 +243,7 @@ func (s *service) VerifyEmail(ctx context.Context, token string) (*user.MessageR
 		return nil, fmt.Errorf("service: verify email get user: %w", err)
 	}
 	if u == nil || u.EmailVerificationExpires == nil || u.EmailVerificationExpires.Before(time.Now()) {
-		return nil, appErrors.ErrInvalidInput
+		return nil, appErrors.NewInvalidToken("Verification link is invalid or has expired")
 	}
 	u.IsEmailVerified = true
 	u.EmailVerificationToken = nil
@@ -277,8 +255,6 @@ func (s *service) VerifyEmail(ctx context.Context, token string) (*user.MessageR
 	}
 	return &user.MessageResponse{Message: "Email verified successfully."}, nil
 }
-
-// ResendVerification sends a new verification email if the user exists and is not verified.
 
 func (s *service) ResendVerification(ctx context.Context, req ResendVerificationRequest) (*user.MessageResponse, error) {
 	u, err := s.userRepo.GetByEmail(ctx, req.Email)
@@ -302,14 +278,12 @@ func (s *service) ResendVerification(ctx context.Context, req ResendVerification
 		return nil, fmt.Errorf("service: resend verification update user: %w", err)
 	}
 
-	// Send Email
 	if err := s.mailer.SendVerificationEmail(u.Email, rawToken); err != nil {
-		// log error
+		log.Printf("📧 service resend verification send email failed: %v", err)
 	}
-	return &user.MessageResponse{Message: "A verifcation link has been sent to your email address"}, nil
+	return &user.MessageResponse{Message: "A verification link has been sent to your email address"}, nil
 }
 
-// ForgotPassword initiates the password reset flow.
 func (s *service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (*user.MessageResponse, error) {
 	u, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
@@ -319,7 +293,6 @@ func (s *service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 		return &user.MessageResponse{Message: "A password reset link has been sent to your email address"}, nil
 	}
 
-	// Generate reset token
 	rawToken, hashedToken := generateToken()
 	expiresAt := time.Now().Add(10 * time.Minute)
 
@@ -331,14 +304,12 @@ func (s *service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 		return nil, fmt.Errorf("service: forgot password update user: %w", err)
 	}
 
-	// Send Email
 	if err := s.mailer.SendPasswordResetEmail(u.Email, rawToken); err != nil {
-		// Log error
+		log.Printf("service: 📧 forgot password send reset email failed: %v", err)
 	}
-	return &user.MessageResponse{Message: "A Password reset link has been sent to your email address"}, nil
+	return &user.MessageResponse{Message: "A password reset link has been sent to your email address"}, nil
 }
 
-// ResetPassword sets a new password using a valid reset token.
 func (s *service) ResetPassword(ctx context.Context, token string, req ResetPasswordRequest) (*user.MessageResponse, error) {
 	hashed := hashToken(token)
 	u, err := s.userRepo.GetByPasswordResetToken(ctx, hashed)
@@ -346,8 +317,9 @@ func (s *service) ResetPassword(ctx context.Context, token string, req ResetPass
 		return nil, fmt.Errorf("service: reset password get user: %w", err)
 	}
 	if u == nil || u.PasswordResetExpires == nil || u.PasswordResetExpires.Before(time.Now()) {
-		return nil, appErrors.ErrInvalidInput
+		return nil, appErrors.NewInvalidToken("Password reset link is invalid or has expired")
 	}
+
 	newHash, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, fmt.Errorf("service: reset password hash: %w", err)
@@ -364,14 +336,12 @@ func (s *service) ResetPassword(ctx context.Context, token string, req ResetPass
 		return nil, fmt.Errorf("service: reset password update user: %w", err)
 	}
 
-	// Revoke all refresh tokens for this user (force re-login)
 	if err := s.authRepo.RevokeAllForUser(ctx, u.ID); err != nil {
-		log.Printf("revoke refresh token failed", err)
+		log.Printf("revoke refresh token failed: %v", err)
 	}
 	return &user.MessageResponse{Message: "Password has been reset successfully"}, nil
 }
 
-// Logout revokes the provided refresh token.
 func (s *service) Logout(ctx context.Context, refreshToken string) (*user.MessageResponse, error) {
 	hashed := hashToken(refreshToken)
 

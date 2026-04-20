@@ -69,8 +69,8 @@ func WriteSuccess(w http.ResponseWriter, r *http.Request, statusCode int, data i
 	}
 	payload := APIResponse{
 		Status:  StatusSuccess,
-		Data:    data,
 		Message: msg,
+		Data:    data,
 		Meta:    generateMeta(r),
 	}
 	writeJSON(w, statusCode, payload)
@@ -101,11 +101,46 @@ func WriteServerError(w http.ResponseWriter, r *http.Request, code, message stri
 	writeJSON(w, http.StatusInternalServerError, payload)
 }
 
+// sentinelToStatus maps sentinel errors to HTTP status codes.
+func sentinelToStatus(err error) int {
+	switch {
+	case errors.Is(err, appErrors.ErrNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, appErrors.ErrConflict):
+		return http.StatusConflict
+	case errors.Is(err, appErrors.ErrInvalidInput):
+		return http.StatusBadRequest
+	case errors.Is(err, appErrors.ErrUnauthorized):
+		return http.StatusUnauthorized
+	case errors.Is(err, appErrors.ErrForbidden):
+		return http.StatusForbidden
+	default:
+		return http.StatusInternalServerError
+	}
+}
+func sentinelToCodeAndMessage(statusCode int) (code, message string) {
+	switch statusCode {
+	case http.StatusNotFound:
+		return appErrors.CodeNotFound, "Resource not found"
+	case http.StatusConflict:
+		return appErrors.CodeConflict, "Resource already exists"
+	case http.StatusBadRequest:
+		return appErrors.CodeInvalidInput, "Invalid input"
+	case http.StatusUnauthorized:
+		return appErrors.CodeUnauthorized, "Unauthorized"
+	case http.StatusForbidden:
+		return appErrors.CodeForbidden, "Forbidden"
+	default:
+		return appErrors.CodeInternalServer, "Internal server error"
+	}
+}
+
 // HandleError inspects the error and writes the appropriate HTTP response.
 // If userMessage is provided, it overrides the default message.
 func HandleError(w http.ResponseWriter, r *http.Request, err error, userMessage ...string) {
 	var statusCode int
 	var errCode string
+	var message string
 	var details []ErrorDetail
 
 	// 1. Check for structured validation errors first
@@ -122,65 +157,42 @@ func HandleError(w http.ResponseWriter, r *http.Request, err error, userMessage 
 				Index:   ve.Index, // preserve index
 			}
 		}
-	} else {
-		// 2. Check sentinel errors
-		switch {
-		case errors.Is(err, appErrors.ErrNotFound):
-			statusCode = http.StatusNotFound
-			errCode = "NOT_FOUND"
-		case errors.Is(err, appErrors.ErrConflict):
-			statusCode = http.StatusConflict
-			errCode = "CONFLICT"
-		case errors.Is(err, appErrors.ErrInvalidInput):
-			statusCode = http.StatusBadRequest
-			errCode = "INVALID_INPUT"
-		case errors.Is(err, appErrors.ErrUnauthorized):
-			statusCode = http.StatusUnauthorized
-			errCode = "UNAUTHORIZED"
-		case errors.Is(err, appErrors.ErrForbidden):
-			statusCode = http.StatusForbidden
-			errCode = "FORBIDDEN"
-		default:
-			statusCode = http.StatusInternalServerError
-			errCode = "INTERNAL_SERVER_ERROR"
-		}
+		WriteFail(w, r, statusCode, errCode, "Validation failed", details)
+		return
 	}
 
-	// Determine the user-facing message
-	var message string
+	// 2. DetailedError
+	var detailedErr *appErrors.DetailedError
+	if errors.As(err, &detailedErr) {
+		statusCode = sentinelToStatus(detailedErr.Err)
+		if len(userMessage) > 0 && userMessage[0] != "" {
+			message = userMessage[0]
+		} else {
+			message = detailedErr.Message
+		}
+
+		if statusCode >= 500 {
+			log.Printf("Internal server error: %v", err)
+			WriteServerError(w, r, detailedErr.Code, message)
+			return
+		}
+		WriteFail(w, r, statusCode, detailedErr.Code, message, nil)
+		return
+	}
+
+	// Fallback
+	statusCode = sentinelToStatus(err)
+	errCode, message = sentinelToCodeAndMessage(statusCode)
+
 	if len(userMessage) > 0 && userMessage[0] != "" {
 		message = userMessage[0]
-	} else {
-		// Default messages
-		switch statusCode {
-		case http.StatusNotFound:
-			message = "Resource not found"
-		case http.StatusConflict:
-			message = "Resource already exists"
-		case http.StatusBadRequest:
-			if details != nil {
-				message = "Validation failed"
-			} else {
-				message = "Invalid input"
-			}
-		case http.StatusUnauthorized:
-			message = "Unauthorized"
-		case http.StatusForbidden:
-			message = "Forbidden"
-		default:
-			message = "Internal server error"
-		}
 	}
 
-	// Log internal errors for debugging
 	if statusCode >= 500 {
 		log.Printf("Internal server error: %v", err)
-	}
-
-	// Write the appropriate response
-	if statusCode >= 500 {
 		WriteServerError(w, r, errCode, message)
-	} else {
-		WriteFail(w, r, statusCode, errCode, message, details)
+		return
 	}
+	WriteFail(w, r, statusCode, errCode, message, nil)
+
 }

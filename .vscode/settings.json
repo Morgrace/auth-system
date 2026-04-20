@@ -1,0 +1,25 @@
+{
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "auth_system",
+      "database": "auth_system",
+      "username": "Mylove12@"
+    },
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "go_auth_system_db",
+      "database": "auth_system",
+      "username": "morgrace",
+      "password": "Mylove12@"
+    }
+  ]
+}
