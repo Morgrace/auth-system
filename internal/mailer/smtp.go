@@ -92,10 +92,10 @@ func (m *SMTPMailer) send(to, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("SMTP DATA failed: %w", err)
 	}
-
+	fromHeader := fmt.Sprintf("Go Auth System <%s>", m.from)
 	msg := fmt.Sprintf(
 		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		m.from, to, subject, body,
+		fromHeader, to, subject, body,
 	)
 
 	if _, err = fmt.Fprint(w, msg); err != nil {
