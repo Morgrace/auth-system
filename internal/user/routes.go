@@ -14,5 +14,7 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, authMW *middleware.AuthMiddl
 
 	mux.Handle("PATCH /user/profile", protect(h.UpdateProfile))
 
+	mux.Handle("GET /user/me", protect(h.GetUser))
+
 	mux.Handle("DELETE /user", protect(h.SoftDelete))
 }

@@ -25,6 +25,21 @@ func getUserID(r *http.Request) (uuid.UUID, error) {
 	return id, nil
 }
 
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+	userID, err := getUserID(r)
+	if err != nil {
+		utils.HandleError(w, r, err)
+		return
+	}
+
+	resp, err := h.service.GetUser(r.Context(), userID)
+	if err != nil {
+		utils.HandleError(w, r, err)
+		return
+	}
+	utils.WriteSuccess(w, r, http.StatusOK, resp, "User retrieved successfully")
+}
+
 func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	userID, err := getUserID(r)
 	if err != nil {

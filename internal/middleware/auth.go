@@ -2,12 +2,14 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/Morgrace/auth-system/internal/types"
 	"github.com/Morgrace/auth-system/pkg/utils"
 	appErrors "github.com/Morgrace/auth-system/pkg/utils/errors"
+	"github.com/google/uuid"
 )
 
 type AuthMiddleware struct {
@@ -39,7 +41,14 @@ func (am *AuthMiddleware) Protect(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), types.UserIDKey, claims.UserID)
+		userID, err := uuid.Parse(claims.UserID)
+		if err != nil {
+			log.Printf("middleware protect: parse uuid:%v", err)
+			utils.WriteServerError(w, r, appErrors.CodeInternalServer, "Something went wrong")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), types.UserIDKey, userID)
 		ctx = context.WithValue(ctx, types.UserRoleKey, claims.Role)
 		r = r.WithContext(ctx)
 

@@ -41,8 +41,8 @@ type ErrorPayload struct {
 
 type APIResponse struct {
 	Status  ResponseStatus `json:"status"`
-	Data    interface{}    `json:"data,omitempty"`
 	Message string         `json:"message,omitempty"`
+	Data    interface{}    `json:"data,omitempty"`
 	Error   *ErrorPayload  `json:"error,omitempty"`
 	Meta    Meta           `json:"meta"`
 }

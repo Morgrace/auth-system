@@ -20,6 +20,8 @@ type Service interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, req UpdatePasswordRequest) (*MessageResponse, error)
 
 	SoftDelete(ctx context.Context, userID uuid.UUID) (*MessageResponse, error)
+
+	GetUser(ctx context.Context, userID uuid.UUID) (*UserResponse, error)
 }
 
 type service struct {
@@ -32,6 +34,20 @@ func NewService(userRepo Repository, revokeTokens RevokeTokensFunc) Service {
 		userRepo:     userRepo,
 		revokeTokens: revokeTokens,
 	}
+}
+
+func (s *service) GetUser(ctx context.Context, userID uuid.UUID) (*UserResponse, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service: get user: %w", err)
+	}
+	if user == nil || !user.IsActive {
+		return nil, appErrors.NewNotFound("User does not exist")
+	}
+
+	resp := ToUserResponse(user)
+	return &resp, nil
+
 }
 
 func (s *service) UpdateProfile(ctx context.Context, userID uuid.UUID, req UpdateProfileRequest) (*UserResponse, error) {

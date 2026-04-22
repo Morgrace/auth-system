@@ -184,7 +184,7 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken, deviceInfo, ip
 		if err := s.authRepo.RevokeFamily(ctx, stored.FamilyID); err != nil {
 			log.Printf("service: failed to revoke family on reuse detection : %v", err)
 		}
-		return nil, appErrors.NewInvalidToken("Refresh token has already been used")
+		return nil, appErrors.NewInvalidToken("Refresh token has already been used! Please login again.")
 	}
 
 	if stored.ExpiresAt.Before(time.Now()) {
