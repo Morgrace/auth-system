@@ -94,5 +94,5 @@ func (h *Handler) SoftDelete(w http.ResponseWriter, r *http.Request) {
 		utils.HandleError(w, r, err)
 		return
 	}
-	utils.WriteSuccess(w, r, http.StatusOK, resp, resp.Message)
+	utils.WriteSuccess(w, r, http.StatusNoContent, resp, resp.Message)
 }

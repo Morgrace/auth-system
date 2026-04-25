@@ -20,7 +20,7 @@ func (rm *RoleMiddleware) Require(roles ...types.Role) func(http.Handler) http.H
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userRole, ok := r.Context().Value(types.UserRoleKey).(types.Role)
 			if !ok || !slices.Contains(roles, userRole) {
-				utils.HandleError(w, r, appErrors.ErrForbidden)
+				utils.HandleError(w, r, appErrors.ErrForbidden, "You do not have permission to access this resource")
 				return
 			}
 			next.ServeHTTP(w, r)
