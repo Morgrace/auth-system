@@ -92,7 +92,7 @@ func (s *service) UpdatePassword(ctx context.Context, userID uuid.UUID, req Upda
 		return nil, fmt.Errorf("service: update password check current: %w", err)
 	}
 	if !ok {
-		return nil, appErrors.ErrUnauthorized
+		return nil, appErrors.NewInvalidInput("current password is incorrect")
 	}
 
 	// Hash new password

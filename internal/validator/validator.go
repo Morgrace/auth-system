@@ -2,6 +2,7 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -44,8 +45,8 @@ func parseValidationErr(err error, index *int) appErrors.ValidationErrors {
 		for i, fieldErr := range validationErrors {
 			out[i] = appErrors.ValidationError{
 				Field:   fieldErr.Field(),
-				Message: msgForTag(fieldErr.Tag()),
-				Code:    fieldErr.Tag(),
+				Message: msgForTag(fieldErr.ActualTag(), fieldErr.Param()),
+				Code:    fieldErr.ActualTag(),
 				Index:   index,
 			}
 		}
@@ -54,13 +55,16 @@ func parseValidationErr(err error, index *int) appErrors.ValidationErrors {
 	return nil
 }
 
-func msgForTag(tag string) string {
+func msgForTag(tag string, param string) string {
 	switch tag {
 	case "required":
 		return "This field is required"
 	case "email":
 		return "Invalid email format"
-	// ... others
+	case "min":
+		return fmt.Sprintf("Must be at least %s characters", param)
+	case "max":
+		return fmt.Sprintf("Must not exceed %s characters", param)
 	default:
 		return "Invalid value"
 	}

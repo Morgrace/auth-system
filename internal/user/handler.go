@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/Morgrace/auth-system/internal/types"
@@ -19,6 +20,7 @@ func NewHandler(service Service) *Handler {
 
 func getUserID(r *http.Request) (uuid.UUID, error) {
 	id, ok := r.Context().Value(types.UserIDKey).(uuid.UUID)
+	fmt.Println("user id", id)
 	if !ok {
 		return uuid.Nil, appErrors.ErrUnauthorized
 	}
@@ -53,6 +55,7 @@ func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.UpdatePassword(r.Context(), userID, req)
+
 	if err != nil {
 		utils.HandleError(w, r, err)
 		return

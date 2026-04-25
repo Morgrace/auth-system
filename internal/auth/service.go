@@ -258,12 +258,15 @@ func (s *service) VerifyEmail(ctx context.Context, token string) (*user.MessageR
 
 func (s *service) ResendVerification(ctx context.Context, req ResendVerificationRequest) (*user.MessageResponse, error) {
 	u, err := s.userRepo.GetByEmail(ctx, req.Email)
+
 	if err != nil {
 		return nil, fmt.Errorf("service: resend verification get user: %w", err)
 	}
+
 	if u == nil || !u.IsActive {
-		return &user.MessageResponse{Message: "If your email exists, a verification link has been sent."}, nil
+		return &user.MessageResponse{Message: "A verification link has been sent to your email address"}, nil
 	}
+
 	if u.IsEmailVerified {
 		return &user.MessageResponse{Message: "Email already verified."}, nil
 	}
